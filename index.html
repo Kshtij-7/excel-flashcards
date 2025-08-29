@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Flashcards App</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f8f9fc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px;
+    }
+    h1 { color: #333; margin-bottom: 20px; }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 40px;
+      width: 420px;
+      min-height: 200px;
+      text-align: center;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      transition: transform 0.3s ease;
+    }
+    .card:hover { transform: translateY(-5px); }
+    #question {
+      font-size: 20px;
+      font-weight: bold;
+      color: #222;
+    }
+    #answer {
+      margin-top: 20px;
+      font-size: 18px;
+      color: #555;
+      display: none;
+    }
+    .buttons {
+      margin-top: 25px;
+      display: flex;
+      justify-content: space-around;
+    }
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      background: #007bff;
+      color: #fff;
+      transition: background 0.3s ease;
+    }
+    button:hover { background: #0056b3; }
+    button:disabled { background: #aaa; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <h1>Excel Flashcards</h1>
+  <input type="file" id="upload" accept=".xlsx,.xls" />
+  <div class="card" id="flashcard">
+    <div id="question">Upload an Excel file to start</div>
+    <div id="answer"></div>
+    <div class="buttons">
+      <button id="nextBtn" disabled>Next Question</button>
+      <button id="showBtn" disabled>Show Answer</button>
+    </div>
+  </div>
+
+  <script>
+    let flashcards = [];
+    let currentIndex = -1;
+
+    document.getElementById('upload').addEventListener('change', handleFile, false);
+
+    function handleFile(e) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const data = new Uint8Array(event.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+        flashcards = rows.slice(1) // skip header
+          .filter(r => r.length >= 2)
+          .map(r => ({ question: r[0], answer: r[1] }));
+
+        if (flashcards.length > 0) {
+          document.getElementById('nextBtn').disabled = false;
+          document.getElementById('showBtn').disabled = false;
+          nextQuestion();
+        } else {
+          alert("No valid questions found in the file!");
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function nextQuestion() {
+      currentIndex = Math.floor(Math.random() * flashcards.length);
+      document.getElementById('question').textContent = flashcards[currentIndex].question;
+      document.getElementById('answer').style.display = "none";
+    }
+
+    function showAnswer() {
+      if (currentIndex >= 0) {
+        const ansDiv = document.getElementById('answer');
+        ansDiv.textContent = flashcards[currentIndex].answer;
+        ansDiv.style.display = "block";
+      }
+    }
+
+    document.getElementById('nextBtn').addEventListener('click', nextQuestion);
+    document.getElementById('showBtn').addEventListener('click', showAnswer);
+  </script>
+</body>
+</html>
