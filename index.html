@@ -39,13 +39,15 @@
       color: #555;
       display: none;
     }
-    .buttons {
-      margin-top: 25px;
+    .controls {
+      margin-top: 20px;
       display: flex;
-      justify-content: space-around;
+      gap: 15px;
+      align-items: center;
     }
     button {
       padding: 10px 20px;
+      
       border: none;
       border-radius: 8px;
       cursor: pointer;
@@ -56,25 +58,46 @@
     }
     button:hover { background: #0056b3; }
     button:disabled { background: #aaa; cursor: not-allowed; }
+    select {
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
   <h1>Excel Flashcards</h1>
   <input type="file" id="upload" accept=".xlsx,.xls" />
+  <div class="controls">
+    <label for="topicSelect">Topic:</label>
+    <select id="topicSelect" disabled></select>
+  </div>
   <div class="card" id="flashcard">
     <div id="question">Upload an Excel file to start</div>
     <div id="answer"></div>
-    <div class="buttons">
-      <button id="nextBtn" disabled>Next Question</button>
-      <button id="showBtn" disabled>Show Answer</button>
+    <centre>
+    <div class="controls">
+      <button id="toggleBtn" disabled>Start</button>
     </div>
+    </centre>
   </div>
 
   <script>
+    let flashcardsBySheet = {};
     let flashcards = [];
     let currentIndex = -1;
+    let showingAnswer = false;
 
-    document.getElementById('upload').addEventListener('change', handleFile, false);
+    const upload = document.getElementById('upload');
+    const topicSelect = document.getElementById('topicSelect');
+    const toggleBtn = document.getElementById('toggleBtn');
+    const qDiv = document.getElementById('question');
+    const aDiv = document.getElementById('answer');
+
+    upload.addEventListener('change', handleFile, false);
+    topicSelect.addEventListener('change', handleTopicChange);
+    toggleBtn.addEventListener('click', handleToggle);
 
     function handleFile(e) {
       const file = e.target.files[0];
@@ -82,40 +105,82 @@
       reader.onload = function(event) {
         const data = new Uint8Array(event.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-        flashcards = rows.slice(1) // skip header
-          .filter(r => r.length >= 2)
-          .map(r => ({ question: r[0], answer: r[1] }));
+        flashcardsBySheet = {};
+        workbook.SheetNames.forEach(sheetName => {
+          const sheet = workbook.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+          const cards = rows.slice(1)
+            .filter(r => r.length >= 2)
+            .map(r => ({ question: r[0], answer: r[1] }));
+          if (cards.length > 0) {
+            flashcardsBySheet[sheetName] = cards;
+          }
+        });
 
-        if (flashcards.length > 0) {
-          document.getElementById('nextBtn').disabled = false;
-          document.getElementById('showBtn').disabled = false;
-          nextQuestion();
-        } else {
-          alert("No valid questions found in the file!");
-        }
+        // Populate dropdown
+        topicSelect.innerHTML = "";
+        const allOption = document.createElement('option');
+        allOption.value = "ALL";
+        allOption.textContent = "All Topics";
+        topicSelect.appendChild(allOption);
+
+        Object.keys(flashcardsBySheet).forEach(sheet => {
+          const opt = document.createElement('option');
+          opt.value = sheet;
+          opt.textContent = sheet;
+          topicSelect.appendChild(opt);
+        });
+
+        topicSelect.disabled = false;
+        topicSelect.value = "ALL";
+        handleTopicChange();
       };
       reader.readAsArrayBuffer(file);
     }
 
+    function handleTopicChange() {
+      const selected = topicSelect.value;
+      if (selected === "ALL") {
+        flashcards = Object.values(flashcardsBySheet).flat();
+      } else {
+        flashcards = flashcardsBySheet[selected] || [];
+      }
+
+      if (flashcards.length > 0) {
+        toggleBtn.disabled = false;
+        nextQuestion();
+      } else {
+        toggleBtn.disabled = true;
+        qDiv.textContent = "No questions found in this topic.";
+        aDiv.style.display = "none";
+      }
+    }
+
+    function handleToggle() {
+      if (!showingAnswer) {
+        showAnswer();
+      } else {
+        nextQuestion();
+      }
+    }
+
     function nextQuestion() {
       currentIndex = Math.floor(Math.random() * flashcards.length);
-      document.getElementById('question').textContent = flashcards[currentIndex].question;
-      document.getElementById('answer').style.display = "none";
+      qDiv.textContent = flashcards[currentIndex].question;
+      aDiv.style.display = "none";
+      showingAnswer = false;
+      toggleBtn.textContent = "Show Answer";
     }
 
     function showAnswer() {
       if (currentIndex >= 0) {
-        const ansDiv = document.getElementById('answer');
-        ansDiv.textContent = flashcards[currentIndex].answer;
-        ansDiv.style.display = "block";
+        aDiv.textContent = flashcards[currentIndex].answer;
+        aDiv.style.display = "block";
+        showingAnswer = true;
+        toggleBtn.textContent = "Next Question";
       }
     }
-
-    document.getElementById('nextBtn').addEventListener('click', nextQuestion);
-    document.getElementById('showBtn').addEventListener('click', showAnswer);
   </script>
 </body>
 </html>
